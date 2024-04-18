@@ -20,10 +20,10 @@ final class Statement extends DataStatement {
 
 		if ('' != $table_like) {
 			if (str_starts_with($table_like, '%') || str_ends_with($table_like, '%')) {
-				$sql .= ' LIKE "'.$table_like.'"';
+				$sql .= ' LIKE \''.$table_like.'\'';
 			}
 			else {
-				$sql .= ' LIKE "%'.$table_like.'%"';
+				$sql .= ' LIKE \'%'.$table_like.'%\'';
 			}
 		}
 

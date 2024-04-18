@@ -14,7 +14,7 @@ final class Statement extends DataStatement {
 			$schema = $this->contract->connector->getConfig()->schema;
 		}
 
-		return 'SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname="'.$schema.'"';
+		return 'SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname LIKE \''.$schema.'\'';
 	}
 
 	protected function initialize(): void {

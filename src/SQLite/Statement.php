@@ -11,14 +11,14 @@ use Ultra\Data\Statement as DataStatement;
 final class Statement extends DataStatement {
 	public function showTables(string $table_like = '', string $schema = '', string $dbname = ''): string {
 		if ('' == $table_like) {
-			return 'SELECT name FROM sqlite_schema WHERE  type = "table"';
+			return 'SELECT name FROM sqlite_schema WHERE  type = \'table\'';
 		}
 
 		if (str_starts_with($table_like, '%') || str_ends_with($table_like, '%')) {
-			return 'SELECT name FROM sqlite_schema WHERE  type = "table" AND name LIKE "'.$table_like.'"';
+			return 'SELECT name FROM sqlite_schema WHERE  type = \'table\' AND name LIKE \''.$table_like.'\'';
 		}
 
-		return 'SELECT name FROM sqlite_schema WHERE  type = "table" AND name LIKE "%'.$table_like.'%"';
+		return 'SELECT name FROM sqlite_schema WHERE  type = \'table\' AND name LIKE \'%'.$table_like.'%\'';
 	}
 
 	protected function initialize(): void {
