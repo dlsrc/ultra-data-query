@@ -13,7 +13,7 @@ use Ultra\State;
 final class Insert {
 	private const string FIELD_PATTERN = '/^(\w[\w\.]*?\w?)(?::((?:\?|)(?:i|d|b|s)(?:\.|)))?$/';
 
-	public readonly Browser $contract;
+	public readonly Storage $contract;
 	private string $_table;
 	private array $_fields;
 	private array $_types;
@@ -21,8 +21,8 @@ final class Insert {
 	private bool $_boolean;
 	private int $_count;
 	private Fail|null $_error;
-	
-	public function __construct(Browser $contract, string $table, string ...$fields) {
+
+	public function __construct(Storage $contract, string $table, string ...$fields) {
 		$this->contract  = $contract;
 		$this->_table    = '';
 		$this->_fields   = [];
