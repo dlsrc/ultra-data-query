@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 /**
- * (c) 2005-2024 Dmitry Lebedev <dl@adios.ru>
+ * (c) 2005-2025 Dmitry Lebedev <dl@adios.ru>
  * This source code is part of the Ultra data package.
  * Please see the LICENSE file for copyright and licensing information.
  */
@@ -8,16 +8,16 @@ namespace Ultra\Data;
 
 // {} {1} {name}
 // {:?} {1:d} {class:S} {role_id:?i}
-// Переменная шаблона может быть помечена как: string, conctant, integer, doouble: :s , :c , :i и :d , соответственно;
+// Переменная шаблона может быть помечена как: string, constant, integer, double: :s , :c , :i и :d , соответственно;
 // может быть пометка boolean :b и если логический тип явно поддерживается (PostgreSQL)
-// будет выполняться замена переменной на константы 'TRUE' и 'FALSE',
+// будет выполняться замена переменной на SQL константы 'TRUE' и 'FALSE',
 // если у БД нет явной поддержки boolean (MySQL), должно выполнятся приведение к integer (0 и 1);
 // Тип blob помечается как :z, считается готовым к вставке и не обрабатывается функцией экранирования, как string.
 // Значения string и blob при замене переменных должны обрамляться одинарными кавычками.
 //
 // Маркер NULL:
 // Переменная может принимать NULL и быть NULL,
-// о чём должна быть особая пометка :? , :?s , :?c , :?i , :?d , :?b , тогда значение NULL заменяется константой 'NULL'.
+// о чём должна быть особая пометка :? , :?s , :?c , :?i , :?d , :?b , тогда значение NULL заменяется SQL константой 'NULL'.
 // Передача NULL для переменной без пометки :? считается ошибкой.
 //
 // Допустимы случаи приведения типов:
@@ -38,7 +38,7 @@ namespace Ultra\Data;
 //
 // Если переменная не содержит маркеров типа, то тип устанавливается исходя из типа переданного значения и
 // совершается соответствующее типу форматирование. При этом, значение NULL станет неформатированной строкой 'NULL',
-// значения bool, если БД поддерживает логический тип данных и задан флаг поддержкb use_boolean, будет представлено
+// значения bool, если БД поддерживает логический тип данных и задан флаг поддержки use_boolean, будет представлено
 // неформатированными строками 'TRUE' и 'FALSE', иначе целыми числами 0 и 1.
 //
 // Списки и ассоциации:
@@ -59,21 +59,21 @@ namespace Ultra\Data;
 //
 // Условные вставки:
 // В квдратные скобки можно заключать подстроки условной вставки.
-// Если заключенная между скобками [] часть строки содержит переменную, то такая подстрока будет
-// изъята из строки запроса включая скобки [] в том случае, если хотя бы для одной из переменных в подстроке не передано значение.
+// Если заключенная между скобками [] часть строки содержит переменную и если хотя бы для одной из переменных в подстроке
+// не передано значение, то такая подстрока будет изъята из строки запроса включая скобки [].
 // Например, в запросе
-// [SELECT * FROM books WHERE status = {status:b}[ AND lang_id = {lang:i}]
+// SELECT * FROM books WHERE status = {status:b}[ AND lang_id = {lang:i}]
 // есть переменная lang внутри текстового блока ограниченного скобками [].
 // Если значение для переменной lang не передано или передано значение NULL, то запрос примет вид:
-// [SELECT * FROM books WHERE status = {status:b}
+// SELECT * FROM books WHERE status = {status:b}
 // Если требуется сделать условным блок явно не содержащий переменныж, например такой:
-// [SELECT * FROM books WHERE status = {status:b}[ AND author_last_name IS NOT NULL]
+// SELECT * FROM books WHERE status = {status:b}[ AND author_last_name IS NOT NULL]
 // можно создать фейковую переменную помеченную маркером :f. Вставка в такую переменную никогда не происходит,
-// но отслеживается факт передачи любого не NULL значения.
+// она всегда заменяется пустой строкой, но при этом отслеживается факт передачи любого не NULL значения в такую переменную.
 // Запрос представленный выше можно записать как-то так:
-// [SELECT * FROM books WHERE status = {status:b}[{last:f} AND author_last_name IS NOT NULL] или
-// [SELECT * FROM books WHERE status = {status:b}[ AND author_last_name{last:f} IS NOT NULL] или
-// [SELECT * FROM books WHERE status = {status:b}[ AND author_last_name IS NOT NULL{last:f}]
+// SELECT * FROM books WHERE status = {status:b}[{last:f} AND author_last_name IS NOT NULL] или
+// SELECT * FROM books WHERE status = {status:b}[ AND author_last_name{last:f} IS NOT NULL] или
+// SELECT * FROM books WHERE status = {status:b}[ AND author_last_name IS NOT NULL{last:f}]
 // Где размещать переменную с маркером :f внутри блока [] не важно.
 class Query {
 	public const string VARIABLE_MARKER  = ':';
