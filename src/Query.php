@@ -6,81 +6,97 @@
  */
 namespace Ultra\Data;
 
-// {} {1} {name}
-// {:?} {1:d} {class:S} {role_id:?i}
-// Переменная шаблона может быть помечена как: string, constant, integer, double: :s , :c , :i и :d , соответственно;
-// может быть пометка boolean :b и если логический тип явно поддерживается (PostgreSQL)
-// будет выполняться замена переменной на SQL константы 'TRUE' и 'FALSE',
-// если у БД нет явной поддержки boolean (MySQL), должно выполнятся приведение к integer (0 и 1);
-// Тип blob помечается как :z, считается готовым к вставке и не обрабатывается функцией экранирования, как string.
-// Значения string и blob при замене переменных должны обрамляться одинарными кавычками.
-//
-// Маркер NULL:
-// Переменная может принимать NULL и быть NULL,
-// о чём должна быть особая пометка :? , :?s , :?c , :?i , :?d , :?b , тогда значение NULL заменяется SQL константой 'NULL'.
-// Передача NULL для переменной без пометки :? считается ошибкой.
-//
-// Допустимы случаи приведения типов:
-// для string допустима передача значений int и float, к которым нужно добавить обрамление одинарными кавычками;
-// для constant так же допустима передача значений int и float, но они преобразуются в строки без кавычек,
-// то есть подразумевается, что ожидаемым значением константы или результатом функции было целое число или число
-// с плавающей точкой, что приведёт к ошибке запроса, если это не так и ожидалась строка;
-// для integer допустима передача значения bool (преобразуется в 0 и 1) и string, но только если строка содержит число;
-// для double допустимы int и допустимы string, но только если строка содержит число с плавающеё точкой.
-// Передача для string и double значения bool считается ошибкой.
-// 
-// Для запрета приведения типов, метку типа нужно записать в верхнем регистре: :S , :?S , :C , :?C , :I , :?I , :D , :?D ,
-// в этом случае любое несовпадения с ожидаемым типом считается ошибкой.
-// 
-// Переменную шаблона можно пометить как квалификатор поля или таблицы: :q .
-// Значение, передаваемое в такую переменную ещё не экранировано и будетт экранирования в соответствии со спецификой БД.
-// Эсли экранирования не требуется, то метку идентификатора нужно записать в верхнем регистре: :Q .
-//
-// Если переменная не содержит маркеров типа, то тип устанавливается исходя из типа переданного значения и
-// совершается соответствующее типу форматирование. При этом, значение NULL станет неформатированной строкой 'NULL',
-// значения bool, если БД поддерживает логический тип данных и задан флаг поддержки use_boolean, будет представлено
-// неформатированными строками 'TRUE' и 'FALSE', иначе целыми числами 0 и 1.
-//
-// Списки и ассоциации:
-// Метки :l , :a , :A , :k , :K , :v.
-// :l — перемменная ожидает список значений (массив), преобразуемый в строку значений разделенных запятыми.
-// Все значения будут отформатированы в соответствии со своим типом.
-// :a :A — переменная ожидает массив, в котором ключи являются именами квалификаторов. Массив преобразуется в строку
-// вида Q1 = <T1>, Q2 = <T2>, .... Qn = <Tn>. Ключи будут заключены в соответствующие типу БД экранирующие символы.
-// Значения форматируются в соответствии с типом. Если в качестве значения передан NULL,
-// то знак равенства заменяется на IS и пара записывается как Q IS NULL, то же самое касается строк 'NULL' и 'NOT NULL'.
-// Если ключи экранировать не требуется, то метку ассоциации нужно записать в верхнем регистре — :A .
-// :k :K — переменная ожидает массив, но использоваться будут только его ключи в качестве имен квалификаторов.
-// Список ключей преобразуется в строку, в которой ключи перечислены через запятую.
-// Каждый ключ экранируется в соответствующие типу БД экранирующие символы. Если экранирование не требуется, то
-// метку нужно записать в верхнем регистре — :K .
-// :v  — переменная ожидает массив, но использоваться будут только его ключи в качестве списка значений.
-// Список ключей преобразуется в строку, в которой ключи перечислены через запятую и отформатированы в соответствии с типом.
-//
-// Условные вставки:
-// В квдратные скобки можно заключать подстроки условной вставки.
-// Если заключенная между скобками [] часть строки содержит переменную и если хотя бы для одной из переменных в подстроке
-// не передано значение, то такая подстрока будет изъята из строки запроса включая скобки [].
-// Например, в запросе
-// SELECT * FROM books WHERE status = {status:b}[ AND lang_id = {lang:i}]
-// есть переменная lang внутри текстового блока ограниченного скобками [].
-// Если значение для переменной lang не передано или передано значение NULL, то запрос примет вид:
-// SELECT * FROM books WHERE status = {status:b}
-// Если требуется сделать условным блок явно не содержащий переменныж, например такой:
-// SELECT * FROM books WHERE status = {status:b}[ AND author_last_name IS NOT NULL]
-// можно создать фейковую переменную помеченную маркером :f. Вставка в такую переменную никогда не происходит,
-// она всегда заменяется пустой строкой, но при этом отслеживается факт передачи любого не NULL значения в такую переменную.
-// Запрос представленный выше можно записать как-то так:
-// SELECT * FROM books WHERE status = {status:b}[{last:f} AND author_last_name IS NOT NULL] или
-// SELECT * FROM books WHERE status = {status:b}[ AND author_last_name{last:f} IS NOT NULL] или
-// SELECT * FROM books WHERE status = {status:b}[ AND author_last_name IS NOT NULL{last:f}]
-// Где размещать переменную с маркером :f внутри блока [] не важно.
-class Query {
-	public const string VARIABLE_MARKER  = ':';
-	public const string VALUE_NULLABLE   = '?';
-	public const string VALUE_IDENTIFIER = '%';
+use Closure;
+use Ultra\Data\Placeholder\Map;
+use Ultra\Data\Query\Statement;
 
-	public static function prepare(string $query): string {
-		return $query;
+class Query {
+	private const string PATTERN = '/(\{)? (\w+)? (
+		(?<!\:|\}) \: (?!\:|\{) [abdfiknqsuvzABCDIKLNQSUV]? |
+		(?<!\?|\}) \? (?!\?|\{) [abdinsuzABCDILNSU]? |
+		(?<=\{)   \w+ (?=\})
+	)(?(1)\})/ux';
+
+	public readonly Map $map;
+	public readonly Closure $booleans;
+	public readonly string $start_quote;
+	public readonly string $end_quote;
+	private string $_query;
+
+	public function __construct(
+		public readonly Closure $escape,
+		public readonly string $quantifier = '/^[^\W\d]([\w\.]*\w)?$/u',
+		bool $booleans = false,
+		string $quotes = '`',
+
+	) {
+		$this->map = new Map();
+		$this->_query = '';
+
+		if ($booleans) {
+			$this->booleans = fn($value) => $value ? 'TRUE' : 'FALSE';
+		}
+		else {
+			$this->booleans = fn($value) => (string) (int) $value;
+		}
+
+		[$this->start_quote, $this->end_quote] = match(strlen($quotes)) {
+			2 => str_split($quotes),
+			1 => [$quotes, $quotes],
+			default => ['', ''],
+		};
+	}
+
+	public function updateQuery(Placeholder $placeholder): void {
+		if (null == $placeholder->value) {
+			return;
+		}
+
+		$this->_query = str_replace($placeholder->search, $placeholder->value, $this->_query);
+	}
+
+	public function fromList(string $statement, string|int|float|bool|Closure|array|null ...$variables): string {
+		$this->_makeQuery($statement);
+		$this->_fillPraceholders($variables);
+		$this->_dropConditions();
+		$this->map->flush();
+		return $this->_query;
+	}
+
+	public function fromHash(string $statement, array ...$options): string {
+		$this->_makeQuery($statement);
+		$this->_fillPraceholders($options);
+		$this->_dropConditions();
+		$this->map->flush();
+		return $this->_query;
+	}
+
+	private function _makeQuery(string $statement): void {
+		if (0 == preg_match_all(self::PATTERN, $statement, $matches, PREG_OFFSET_CAPTURE)) {
+			return;
+		}
+
+		$sm = new Statement(
+			holders:  array_map(fn($match) => $match[0], $matches[0]),
+			captures: array_map(fn($match) => $match[1], $matches[0]),
+			sequence: array_map(fn($match) => $match[0], $matches[2]),
+			types:    array_map(fn($match) => $match[0], $matches[3]),
+		);
+
+		$this->_query = $sm->buildQuery($statement);
+		$sm->buildMap($this->map);
+	}
+
+	private function _dropConditions(): void {
+		if (str_contains($this->_query, '[')) {
+            $this->_query = str_replace(['{', '}'], '', preg_replace('/\[[^]]*\{\w+\}[^]]*\]/', '', $this->_query));
+        }
+	}
+
+	private function _fillPraceholders(array $vars): void {
+		foreach ($vars as $id => $var) {
+			$placeholder = $this->map->get($id);
+			$placeholder->assign($this, $var);
+		}
 	}
 }
