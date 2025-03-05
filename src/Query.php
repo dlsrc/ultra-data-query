@@ -64,6 +64,17 @@ class Query {
 		return $this->_buildQuery($statement, $options);
 	}
 
+	public function share(string $statement, array $combine): string {
+		if (!$this->_makeQuery($statement)) {
+			return $statement;
+		}
+
+		$this->map->get(0)?->assign($this, $combine);
+		$this->map->get(1)?->assign($this, $combine);
+		$this->map->flush();
+		return $this->_query;
+	}
+
 	private function _buildQuery(string $statement, array $vars): string {
 		if (!$this->_makeQuery($statement)) {
 			return $statement;
