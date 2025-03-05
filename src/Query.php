@@ -7,6 +7,7 @@
 namespace Ultra\Data;
 
 use Closure;
+use Exception;
 use Ultra\Data\Placeholder\Map;
 use Ultra\Data\Query\Statement;
 
@@ -55,25 +56,29 @@ class Query {
 		$this->_query = str_replace($placeholder->search, $placeholder->value, $this->_query);
 	}
 
-	public function fromList(string $statement, string|int|float|bool|Closure|array|null ...$variables): string {
-		$this->_makeQuery($statement);
-		$this->_fillPraceholders($variables);
+	public function list(string $statement, string|int|float|bool|Closure|array|null ...$variables): string {
+		return $this->_buildQuery($statement, $variables);
+	}
+
+	public function map(string $statement, array $options): string {
+		return $this->_buildQuery($statement, $options);
+	}
+
+	private function _buildQuery(string $statement, array $vars): string {
+		if (!$this->_makeQuery($statement)) {
+			return $statement;
+		}
+
+		$this->_fillPraceholders($vars);
 		$this->_dropConditions();
+		$this->_absenceCheck();
 		$this->map->flush();
 		return $this->_query;
 	}
 
-	public function fromHash(string $statement, array ...$options): string {
-		$this->_makeQuery($statement);
-		$this->_fillPraceholders($options);
-		$this->_dropConditions();
-		$this->map->flush();
-		return $this->_query;
-	}
-
-	private function _makeQuery(string $statement): void {
+	private function _makeQuery(string $statement): bool {
 		if (0 == preg_match_all(self::PATTERN, $statement, $matches, PREG_OFFSET_CAPTURE)) {
-			return;
+			return false;
 		}
 
 		$sm = new Statement(
@@ -85,18 +90,31 @@ class Query {
 
 		$this->_query = $sm->buildQuery($statement);
 		$sm->buildMap($this->map);
+		return true;
 	}
 
 	private function _dropConditions(): void {
 		if (str_contains($this->_query, '[')) {
-            $this->_query = str_replace(['{', '}'], '', preg_replace('/\[[^]]*\{\w+\}[^]]*\]/', '', $this->_query));
+            $this->_query = str_replace(['[', ']'], '', preg_replace('/\[[^]]*\{\w+\}[^]]*\]/', '', $this->_query));
         }
 	}
 
 	private function _fillPraceholders(array $vars): void {
-		foreach ($vars as $id => $var) {
-			$placeholder = $this->map->get($id);
-			$placeholder->assign($this, $var);
+		array_walk($vars, fn($var, $id) => $this->map->get($id)?->assign($this, $var));
+	}
+
+	private function _absenceCheck(): void {
+		if (0 == preg_match_all('/\{(\w+)\}/', $this->_query, $matches)) {
+			return;
 		}
+
+		$names = [];
+
+		foreach (array_unique($matches[1]) as $match) {
+			$placeholder = $this->map->get($match);
+			$names[] = '\''.$placeholder->index.$placeholder->type->value.'\'';
+		}
+
+		throw new Exception('Отсутствуют значения необходимые для заполненителей: '.implode(', ', $names).'.');
 	}
 }
