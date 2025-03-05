@@ -137,24 +137,28 @@ enum Type: string {
 		};
 	}
 
+	public function setNumeric(int|string $value): string {
+		if ($this->isUnsigned()) {
+			if ($value < 0) {
+				throw new Exception('Ожидалось, что переменная будет содержать положительное число. Содержит \''.$value.'\'.');
+			}
+		}
+
+		if ($this->isNumeric()) {
+			if ($value < 1) {
+				throw new Exception('Числовая строка \''.$value.'\' не содержит число, которое относится к положительному натуральному численному ряду');
+			}
+		}
+
+		return (string) $value;
+	}
+
 	public function setNumericString(string $value): string {
 		if (!is_numeric($value)) {
 			throw new Exception('Строка \''.$value.'\' не является числовой');
 		}
 
-		if ($this->isUnsigned()) {
-			if ($value < 0) {
-				throw new Exception('Ожидалось, что числовая строка \''.$value.'\' будет содержать положительное число.');
-			}
-		}
-
-		if ($this->isNumeric()) {
-			if ($value <= 0) {
-				throw new Exception('Числовая строка \''.$value.'\' не содержит число, которое относится к положительному натуральному численному ряду');
-			}
-		}
-
-		return $value;
+		return $this->setNumeric($value);
 	}
 
 	public function setConstantString(Query $query, string $value): string {
@@ -175,16 +179,17 @@ enum Type: string {
 				=> '\''.(string) (int) $value.'\'',
 			self::Integer, self::IntegerNullable, self::IntegerStrictNullable,
 			self::Unsigned, self::UnsignedNullable, self::UnsignedStrictNullable,
-			self::Numeric, self::NumericNullable, self::NumericStrictNullable,
 			self::Double, self::DoubleNullable, self::DoubleStrictNullable
 				=> (string) (int) $value,
 			self::Fake
 				=> $value ? '' : null,
 			self::Blob
 				=> (binary) $value,
+			self::Numeric, self::NumericNullable, self::NumericStrictNullable
+				=> $value ? '1' : throw new Exception('Недопустимое значение \'FALSE\' для переменной заполнителя \''.$this->value.'\' c индексом '.$ph->index.':.'),
 			self::Constant, self::ConstantNullable, self::StringStrict, self::IntegerStrict,
 			self::UnsignedStrict, self::NumericStrict, self::DoubleStrict
-				=> throw new Exception('Недопустисый тип \''.gettype($value).'\' для переменной заполнителя \''.$this->value.'\' c индексом '.$ph->index.':.'),
+				=> throw new Exception('Недопустимый тип \'boolean\' для переменной заполнителя \''.$this->value.'\' c индексом '.$ph->index.':.'),
 			self::Quantifier, self::QuantifierUnquoted, self::Keys,
 			self::KeysUnquoted, self::Values, self::ValuesUnquoted
 				=> throw new Exception('Недопустимый контекст \''.$this->value.'\' вызова метода '.__METHOD__.'.'),
@@ -195,11 +200,12 @@ enum Type: string {
 		return match ($this) {
 			self::Sequence, self::Nullable, self::List, self::ListNullable,
 			self::Integer, self::IntegerStrict, self::IntegerNullable, self::IntegerStrictNullable,
-			self::Unsigned, self::UnsignedStrict, self::UnsignedNullable, self::UnsignedStrictNullable,
-			self::Numeric, self::NumericStrict, self::NumericNullable, self::NumericStrictNullable,
 			self::Double, self::DoubleStrict, self::DoubleNullable, self::DoubleStrictNullable,
 			self::Map, self::MapNullable, self::MapUnquoted, self::MapUnquotedNullable
 				=> (string) $value,
+			self::Unsigned, self::UnsignedStrict, self::UnsignedNullable, self::UnsignedStrictNullable,
+			self::Numeric, self::NumericStrict, self::NumericNullable, self::NumericStrictNullable,
+				=> $this->setNumeric($value),
 			self::String, self::StringNullable, self::StringStrictNullable
 				=> '\''.$value.'\'',
 			self::Boolean, self::BooleanNullable, self::BooleanStrictNullable
