@@ -64,13 +64,14 @@ class Query {
 		return $this->_buildQuery($statement, $options);
 	}
 
-	public function share(string $statement, array $combine): string {
+	public function share(string $statement, array $combine, string|int|float|bool|Closure|array|null ...$vars): string {
 		if (!$this->_makeQuery($statement)) {
 			return $statement;
 		}
 
-		$this->map->get(0)?->assign($this, $combine);
-		$this->map->get(1)?->assign($this, $combine);
+		$this->_fillSharePraceholders($combine, $vars);
+		$this->_dropConditions();
+		$this->_absenceCheck();
 		$this->map->flush();
 		return $this->_query;
 	}
@@ -112,6 +113,12 @@ class Query {
 
 	private function _fillPraceholders(array $vars): void {
 		array_walk($vars, fn($var, $id) => $this->map->get($id)?->assign($this, $var));
+	}
+
+	private function _fillSharePraceholders(array $combine, array $vars): void {
+		$this->map->get(0)?->assign($this, $combine);
+		$this->map->get(1)?->assign($this, $combine);
+		array_walk($vars, fn($var, $id) => is_int($id) ? $this->map->get($id + 2)?->assign($this, $var) : $this->map->get($id)?->assign($this, $var));
 	}
 
 	private function _absenceCheck(): void {
