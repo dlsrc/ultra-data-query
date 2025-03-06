@@ -69,11 +69,37 @@ class Query {
 			return $statement;
 		}
 
-		$this->_fillSharePraceholders($combine, $vars);
+		$this->_fillSharePraceholders($combine, $vars, 2);
 		$this->_dropConditions();
 		$this->_absenceCheck();
 		$this->map->flush();
 		return $this->_query;
+	}
+
+	public function shareMap(string $statement, array $options): string {
+		$this->_shareCombineCheck($options);
+
+		if (!$this->_makeQuery($statement)) {
+			return $statement;
+		}
+
+		$combine = $options[0];
+		unset($options[0]);
+		$this->_fillSharePraceholders($combine, $options, 1);
+		$this->_dropConditions();
+		$this->_absenceCheck();
+		$this->map->flush();
+		return $this->_query;
+	}
+
+	private function _shareCombineCheck(array $options): void {
+		if (!isset($options[0])) {
+			throw new Exception('Отсутствует разделяемое значение необходимые для заполненителей с индексами 0 и 1.');
+		}
+
+		if (!is_array($options[0])) {
+			throw new Exception('Неожиденный тип значения. Ожидался \'array\', получен \''.gettype($options[0]).'\'.');
+		}
 	}
 
 	private function _buildQuery(string $statement, array $vars): string {
@@ -115,10 +141,10 @@ class Query {
 		array_walk($vars, fn($var, $id) => $this->map->get($id)?->assign($this, $var));
 	}
 
-	private function _fillSharePraceholders(array $combine, array $vars): void {
+	private function _fillSharePraceholders(array $combine, array $vars, int $offset): void {
 		$this->map->get(0)?->assign($this, $combine);
 		$this->map->get(1)?->assign($this, $combine);
-		array_walk($vars, fn($var, $id) => is_int($id) ? $this->map->get($id + 2)?->assign($this, $var) : $this->map->get($id)?->assign($this, $var));
+		array_walk($vars, fn($var, $id) => (is_int($id) ? $this->map->get($id + $offset) : $this->map->get($id))?->assign($this, $var));
 	}
 
 	private function _absenceCheck(): void {
