@@ -6,6 +6,7 @@
  */
 namespace Ultra\Data\Placeholder;
 
+use Generator;
 use Ultra\Data\Placeholder;
 
 class Map {
@@ -27,8 +28,14 @@ class Map {
 		$this->_placeholders[$index] = new Placeholder($index, $holder, $conditional);
 	}
 
-	public function flush(): void {
+	public function clean(): void {
 		$this->_placeholders = [];
+	}
+
+	public function iterator(): Generator {
+		foreach ($this->_placeholders as $id => $ph) {
+			yield $id => $ph;
+		}
 	}
 
 	public function get(string|int $id): Placeholder|null {

@@ -55,6 +55,10 @@ class Placeholder {
 		$query->updateQuery($this);
 	}
 
+	public function flush(): void {
+		$this->value = null;
+	}
+
 	private function _fromMap(Query $query, array $map): void {
 		$quote_fn = $this->type->fnQuote($query);
 		$var = [];

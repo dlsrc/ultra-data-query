@@ -29,6 +29,8 @@ class Statement {
 	}
 
 	public function buildMap(Map $map): void {
+		$map->clean();
+
 		foreach (array_unique($this->sequence) as $key => $index) {
 			$map->add($index, $this->types[$key], isset($this->captures[$index]));
 		}

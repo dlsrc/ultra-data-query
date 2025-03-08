@@ -54,6 +54,7 @@ class Query {
 		}
 
 		$this->_query = str_replace($placeholder->search, $placeholder->value, $this->_query);
+		$placeholder->flush();
 	}
 
 	public function list(string $statement, string|int|float|bool|Closure|array|null ...$variables): string {
@@ -64,32 +65,13 @@ class Query {
 		return $this->_buildQuery($statement, $options);
 	}
 
-	public function share(string $statement, array $combine, string|int|float|bool|Closure|array|null ...$vars): string {
-		if (!$this->_makeQuery($statement)) {
-			return $statement;
-		}
-
-		$this->_fillSharePraceholders($combine, $vars, 2);
-		$this->_dropConditions();
-		$this->_absenceCheck();
-		$this->map->flush();
-		return $this->_query;
+	public function share(string $statement, array $shared, string|int|float|bool|Closure|array|null ...$variables): string {
+		return $this->_buildQuery($statement, array_merge([$shared, $shared], $variables));
 	}
 
-	public function shareMap(string $statement, array $options): string {
+	public function join(string $statement, array $options): string {
 		$this->_shareCombineCheck($options);
-
-		if (!$this->_makeQuery($statement)) {
-			return $statement;
-		}
-
-		$combine = $options[0];
-		unset($options[0]);
-		$this->_fillSharePraceholders($combine, $options, 1);
-		$this->_dropConditions();
-		$this->_absenceCheck();
-		$this->map->flush();
-		return $this->_query;
+		return $this->_buildQuery($statement, array_merge([$options[0]], $options));
 	}
 
 	private function _shareCombineCheck(array $options): void {
@@ -109,8 +91,6 @@ class Query {
 
 		$this->_fillPraceholders($vars);
 		$this->_dropConditions();
-		$this->_absenceCheck();
-		$this->map->flush();
 		return $this->_query;
 	}
 
@@ -138,27 +118,19 @@ class Query {
 	}
 
 	private function _fillPraceholders(array $vars): void {
-		array_walk($vars, fn($var, $id) => $this->map->get($id)?->assign($this, $var));
-	}
+		$lack = [];
 
-	private function _fillSharePraceholders(array $combine, array $vars, int $offset): void {
-		$this->map->get(0)?->assign($this, $combine);
-		$this->map->get(1)?->assign($this, $combine);
-		array_walk($vars, fn($var, $id) => (is_int($id) ? $this->map->get($id + $offset) : $this->map->get($id))?->assign($this, $var));
-	}
-
-	private function _absenceCheck(): void {
-		if (0 == preg_match_all('/\{(\w+)\}/', $this->_query, $matches)) {
-			return;
+		foreach ($this->map->iterator() as $id => $holder) {
+			if (isset($vars[$id])) {
+				$holder->assign($this, $vars[$id]);
+			}
+			elseif (!$holder->conditional) {
+				$lack[] = '\''.$holder->index.$holder->type->value.'\'';
+			}
 		}
 
-		$names = [];
-
-		foreach (array_unique($matches[1]) as $match) {
-			$placeholder = $this->map->get($match);
-			$names[] = '\''.$placeholder->index.$placeholder->type->value.'\'';
+		if (isset($lack[0])) {
+			throw new Exception('Отсутствуют значения заполненителей '.implode(', ', $lack).', необходимые для построения запроса.');
 		}
-
-		throw new Exception('Отсутствуют значения необходимые для заполненителей: '.implode(', ', $names).'.');
 	}
 }
