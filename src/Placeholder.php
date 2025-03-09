@@ -51,8 +51,6 @@ class Placeholder {
 		else {
 			$this->value = $this->_setVar($query, $var);
 		}
-
-		$query->updateQuery($this);
 	}
 
 	public function flush(): void {

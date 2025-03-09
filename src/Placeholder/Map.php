@@ -21,24 +21,32 @@ class Map {
 			return;
 		}
 
-		if (!$holder = Type::tryFrom($type)) {
+		if (!$placeholder = Type::tryFrom($type)) {
 			exit('Error Placeholder type.');
 		}
 
-		$this->_placeholders[$index] = new Placeholder($index, $holder, $conditional);
+		$this->_placeholders[$index] = new Placeholder($index, $placeholder, $conditional);
 	}
 
 	public function clean(): void {
 		$this->_placeholders = [];
 	}
 
-	public function iterator(): Generator {
-		foreach ($this->_placeholders as $id => $ph) {
-			yield $id => $ph;
+	public function iterator(array|null $keys = null): Generator {
+		if (null === $keys) {
+			$keys = array_keys($this->_placeholders);
+		}
+		
+		foreach ($keys as $id) {
+			yield $id => $this->_placeholders[$id];
 		}
 	}
 
-	public function get(string|int $id): Placeholder|null {
+	public function keys(): array {
+		return array_keys($this->_placeholders);
+	}
+
+	public function get(int|string $id): Placeholder|null {
 		if (isset($this->_placeholders[$id])) {
 			return $this->_placeholders[$id];
 		}

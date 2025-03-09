@@ -22,6 +22,7 @@ class Query {
 	public readonly Closure $booleans;
 	public readonly string $start_quote;
 	public readonly string $end_quote;
+	private bool $_statement;
 	private string $_query;
 
 	public function __construct(
@@ -29,9 +30,9 @@ class Query {
 		public readonly string $quantifier = '/^[^\W\d]([\w\.]*\w)?$/u',
 		bool $booleans = false,
 		string $quotes = '`',
-
 	) {
 		$this->map = new Map();
+		$this->_statement = false;
 		$this->_query = '';
 
 		if ($booleans) {
@@ -48,55 +49,79 @@ class Query {
 		};
 	}
 
-	public function updateQuery(Placeholder $placeholder): void {
-		if (null == $placeholder->value) {
-			return;
+	public function statement(string $statement): void {
+		$this->_make($statement);
+	}
+
+	public function list(string|int|float|bool|Closure|array|null ...$variables): string {
+		return $this->_build($variables);
+	}
+
+	public function map(array $options): string {
+		return $this->_build($options);
+	}
+
+	public function share(array $shared, string|int|float|bool|Closure|array|null ...$variables): string {
+		//return $this->_buildShared1(array_merge([$shared], $variables));
+		return $this->_build(array_merge([$shared, $shared], $variables));
+	}
+
+	public function join(array $options, int|string $common = 0, int|string $attached = 1): string {
+		$this->_commonCheck($options, $common, $attached);
+		return $this->_build(array_merge([$options[$common]], $options));
+	}
+
+	private function _commonCheck(array $options, int|string $common, int|string $attached): void {
+		if (!isset($options[$common])) {
+			throw new Exception('В запросе \''.$this->_query.'\' отсутствует разделяемое значение необходимые для заполненителей с индексами \''.$common.'\' и \''.$attached.'\'.');
 		}
 
-		$this->_query = str_replace($placeholder->search, $placeholder->value, $this->_query);
-		$placeholder->flush();
-	}
-
-	public function list(string $statement, string|int|float|bool|Closure|array|null ...$variables): string {
-		return $this->_buildQuery($statement, $variables);
-	}
-
-	public function map(string $statement, array $options): string {
-		return $this->_buildQuery($statement, $options);
-	}
-
-	public function share(string $statement, array $shared, string|int|float|bool|Closure|array|null ...$variables): string {
-		return $this->_buildQuery($statement, array_merge([$shared, $shared], $variables));
-	}
-
-	public function join(string $statement, array $options): string {
-		$this->_shareCombineCheck($options);
-		return $this->_buildQuery($statement, array_merge([$options[0]], $options));
-	}
-
-	private function _shareCombineCheck(array $options): void {
-		if (!isset($options[0])) {
-			throw new Exception('Отсутствует разделяемое значение необходимые для заполненителей с индексами 0 и 1.');
-		}
-
-		if (!is_array($options[0])) {
-			throw new Exception('Неожиденный тип значения. Ожидался \'array\', получен \''.gettype($options[0]).'\'.');
+		if (!is_array($options[$common])) {
+			throw new Exception('Неожиденный тип значения в запросе \''.$this->_query.'\'. Ожидался \'array\', получен \''.gettype($options[0]).'\'.');
 		}
 	}
 
-	private function _buildQuery(string $statement, array $vars): string {
-		if (!$this->_makeQuery($statement)) {
-			return $statement;
+	private function _build(array $vars): string {
+		if (!$this->_statement) {
+			return $this->_query;
 		}
 
-		$this->_fillPraceholders($vars);
-		$this->_dropConditions();
-		return $this->_query;
+		return $this->_dropConditions($this->_fillPraceholders($this->_query, $vars));
 	}
 
-	private function _makeQuery(string $statement): bool {
+	private function _buildShared1(array $vars, int|string $common = 0, int|string $attached = 1): string {
+		if (!$this->_statement) {
+			return $this->_query;
+		}
+
+		$keys = array_flip($this->map->keys());
+
+		if (!isset($keys[$common])) {
+			throw new Exception('В запросе \''.$this->_query.'\' отсутствует заполненитель с индексом \''.$common.'\'.');
+		}
+
+		if (!isset($keys[1])) {
+			throw new Exception('В запросе \''.$this->_query.'\' отсутствует заполненитель с индексом \''.$attached.'\'.');
+		}
+
+		$query = $this->_query;
+		$query = $this->_assignPlaceholder($this->map->get($common), $query, $vars[$common]);
+		$query = $this->_assignPlaceholder($this->map->get($attached), $query, $vars[$common]);
+		unset($keys[$common], $keys[$attached]);
+		
+		$offset = 2;
+
+		//$keys = array_map(fn($key) => $key + 2, $this->map->keys());
+
+		return $this->_dropConditions($this->_fillPraceholders($this->_query, $vars));
+	}
+
+
+	private function _make(string $statement): void {
 		if (0 == preg_match_all(self::PATTERN, $statement, $matches, PREG_OFFSET_CAPTURE)) {
-			return false;
+			$this->_statement = false;
+			$this->_query = $statement;
+			return;
 		}
 
 		$sm = new Statement(
@@ -106,31 +131,44 @@ class Query {
 			types:    array_map(fn($match) => $match[0], $matches[3]),
 		);
 
+		$this->_statement = true;
 		$this->_query = $sm->buildQuery($statement);
 		$sm->buildMap($this->map);
-		return true;
 	}
 
-	private function _dropConditions(): void {
-		if (str_contains($this->_query, '[')) {
-            $this->_query = str_replace(['[', ']'], '', preg_replace('/\[[^]]*\{\w+\}[^]]*\]/', '', $this->_query));
+	private function _dropConditions(string $query): string {
+		if (str_contains($query, '[')) {
+            return str_replace(['[', ']'], '', preg_replace('/\[[^]]*\{\w+\}[^]]*\]/', '', $query));
         }
+
+		return $query;
 	}
 
-	private function _fillPraceholders(array $vars): void {
+	private function _fillPraceholders(string $query, array $vars): string {
 		$lack = [];
 
-		foreach ($this->map->iterator() as $id => $holder) {
+		foreach ($this->map->iterator() as $placeholder) {
+			$id = $placeholder->id;
+
 			if (isset($vars[$id])) {
-				$holder->assign($this, $vars[$id]);
+				$query = $this->_assignPlaceholder($placeholder, $query, $vars[$id]);
 			}
-			elseif (!$holder->conditional) {
-				$lack[] = '\''.$holder->index.$holder->type->value.'\'';
+			elseif (!$placeholder->conditional) {
+				$lack[] = '\''.$placeholder->index.$placeholder->type->value.'\'';
 			}
 		}
 
 		if (isset($lack[0])) {
-			throw new Exception('Отсутствуют значения заполненителей '.implode(', ', $lack).', необходимые для построения запроса.');
+			throw new Exception('Отсутствуют необходимые для построения запроса \''.$this->_query.'\' значения заполненителей: '.implode(', ', $lack).'.');
 		}
+
+		return $query;
+	}
+
+	private function _assignPlaceholder(Placeholder $placeholder, string $query, string|int|float|bool|Closure|array|null $var): string {
+		$placeholder->assign($this, $var);
+		$query = str_replace($placeholder->search, $placeholder->value, $query);
+		$placeholder->flush();
+		return $query;
 	}
 }
