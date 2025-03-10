@@ -7,6 +7,7 @@
 namespace Ultra\Data\Query;
 
 use Ultra\Data\Placeholder\Map;
+use Ultra\Data\Query;
 
 class Statement {
 	private array $holders;
@@ -37,14 +38,14 @@ class Statement {
 	}
 
 	public function buildQuery(string $statement): string {
-		$this->_indexSequence();
+		$this->_indexSequence($statement);
 
 		return $this->_captureConditionlHolders(
 			$this->_replaceQueryHolders($statement)
 		);
 	}
 
-	private function _indexSequence(): void {
+	private function _indexSequence(string $statement): void {
 		$serial      = 0;
 		$repetitions = [];
 
@@ -59,12 +60,12 @@ class Statement {
 				// когда будут известны все типы заполнитеоей в последовательности.
 				continue;
 			}
+
 			if (!isset($this->explicit[$index])) {
 				while (isset($this->explicit[$serial])) {
 					$serial++;
 				}
 
-				//$this->sequence[$id] = $serial++;
 				$this->sequence[$id] = (string) $serial++;
 			}
 			elseif ($this->explicit[$index] > 1) {
@@ -76,7 +77,7 @@ class Statement {
 					);
 
 					if ($discord) {
-						exit($discord);
+						Query::error(Status::TypeChangeDetected, $statement, $type, $discord);
 					}
 				
 					$repetitions[$index] = $type;

@@ -9,6 +9,7 @@ namespace Ultra\Data;
 use Closure;
 use Exception;
 use Ultra\Data\Placeholder\Type;
+use Ultra\Data\Query\Status;
 
 class Placeholder {
 	public readonly string $index;
@@ -45,7 +46,7 @@ class Placeholder {
 				$this->_fromValues($query, $var);
 			}
 			else {
-				throw new Exception('Значение не соответствует типу заполнителя');
+				Query::error(Status::NotMatchPlaceholderType, $this->type->value);
 			}
 		}
 		else {
@@ -89,7 +90,7 @@ class Placeholder {
 			'double'  => $this->type->fromNumeric($query, $this, $value),
 			'boolean' => $this->type->fromBoolean($query, $this, $value),
 			'NULL'    => $this->type->fromNull($query, $this),
-			default   => throw new Exception('Unexpected parameter value type '.gettype($value).'.'),
+			default   => Query::error(Status::UnexpectedValueType, gettype($value)),
 		};
 	}
 }

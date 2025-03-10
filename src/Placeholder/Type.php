@@ -10,6 +10,7 @@ use Closure;
 use Exception;
 use Ultra\Data\Placeholder;
 use Ultra\Data\Query;
+use Ultra\Data\Query\Status;
 
 enum Type: string {
 	case Sequence               = ':';
@@ -87,7 +88,7 @@ enum Type: string {
 
 	public function quotedString(Query $query, mixed $value): string {
 		if (!$this->isQuantifierString($query, $value)) {
-			throw new Exception(message: 'Array keys are not suitable for use as quantifiers.', code: 390);
+			Query::error(Status::InvalidArrayKeys);
 		}
 
 		return $query->start_quote.str_replace('.', $query->end_quote.'.'.$query->start_quote, $value).$query->end_quote;
@@ -95,7 +96,7 @@ enum Type: string {
 
 	public function unquotedString(Query $query, mixed $value): string {
 		if (!$this->isQuantifierString($query, $value)) {
-			throw new Exception(message: 'Array keys are not suitable for use as quantifiers.', code: 390);
+			Query::error(Status::InvalidArrayKeys);
 		}
 
 		return $value;
@@ -113,7 +114,7 @@ enum Type: string {
 			self::MapUnquotedNullable,
 			self::KeysUnquoted,
 			self::ValuesUnquoted => fn($value) => $this->unquotedString($query, $value),
-			default => throw new Exception('Недопустимый контекст \''.$this->value.'\' вызова метода '.__METHOD__.'.'),
+			default => Query::error(Status::InvalidContext, $this->value, __METHOD__),
 		};
 	}
 
@@ -140,13 +141,13 @@ enum Type: string {
 	public function setNumeric(int|string $value): string {
 		if ($this->isUnsigned()) {
 			if ($value < 0) {
-				throw new Exception('Ожидалось, что переменная будет содержать положительное число. Содержит \''.$value.'\'.');
+				Query::error(Status::NotContainPositiveNumber, $value);
 			}
 		}
 
 		if ($this->isNumeric()) {
 			if ($value < 1) {
-				throw new Exception('Числовая строка \''.$value.'\' не содержит число, которое относится к положительному натуральному численному ряду');
+				Query::error(Status::NotContainNaturalNumber, $value);
 			}
 		}
 
@@ -155,7 +156,7 @@ enum Type: string {
 
 	public function setNumericString(string $value): string {
 		if (!is_numeric($value)) {
-			throw new Exception('Строка \''.$value.'\' не является числовой');
+			Query::error(Status::StringNotNumeric, $value);
 		}
 
 		return $this->setNumeric($value);
@@ -166,7 +167,7 @@ enum Type: string {
 			return $value;
 		}
 
-		throw new Exception('Константная строка \''.$value.'\' содержит недопустимые символы.');
+		Query::error(Status::InvalidCharacters, $value);
 	}
 
 	public function fromBoolean(Query $query, Placeholder $ph, bool $value): string|null {
@@ -186,13 +187,13 @@ enum Type: string {
 			self::Blob
 				=> (binary) $value,
 			self::Numeric, self::NumericNullable, self::NumericStrictNullable
-				=> $value ? '1' : throw new Exception('Недопустимое значение \'FALSE\' для переменной заполнителя \''.$this->value.'\' c индексом '.$ph->index.':.'),
+				=> $value ? '1' : Query::error(Status::InvalidVariableValue, 'FALSE', $this->value, $ph->index),
 			self::Constant, self::ConstantNullable, self::StringStrict, self::IntegerStrict,
 			self::UnsignedStrict, self::NumericStrict, self::DoubleStrict
-				=> throw new Exception('Недопустимый тип \'boolean\' для переменной заполнителя \''.$this->value.'\' c индексом '.$ph->index.':.'),
+				=> Query::error(Status::InvalidVariableType, 'boolean', $this->value, $ph->index),
 			self::Quantifier, self::QuantifierUnquoted, self::Keys,
 			self::KeysUnquoted, self::Values, self::ValuesUnquoted
-				=> throw new Exception('Недопустимый контекст \''.$this->value.'\' вызова метода '.__METHOD__.'.'),
+				=> Query::error(Status::InvalidContext, $this->value, __METHOD__),
 		};
 	}
 
@@ -215,9 +216,9 @@ enum Type: string {
 			self::Blob
 				=> (binary) $value,
 			self::Constant, self::ConstantNullable, self::StringStrict, self::BooleanStrict
-				=> throw new Exception('Недопустисый тип \''.gettype($value).'\' для переменной заполнителя \''.$this->value.'\' c индексом '.$ph->index.':.'),
+				=> Query::error(Status::InvalidVariableType, gettype($value), $this->value, $ph->index),
 			self::Quantifier, self::QuantifierUnquoted, self::Keys, self::KeysUnquoted, self::Values, self::ValuesUnquoted
-				=> throw new Exception('Недопустимый контекст \''.$this->value.'\' вызова метода '.__METHOD__.'.'),
+				=> Query::error(Status::InvalidContext, $this->value, __METHOD__),
 		};
 	}
 
@@ -240,9 +241,9 @@ enum Type: string {
 			self::Blob
 				=> (binary) $value,
 			self::IntegerStrict, self::UnsignedStrict, self::NumericStrict, self::DoubleStrict, self::BooleanStrict
-				=> throw new Exception('Недопустисый тип \'string\' для переменной заполнителя \''.$this->value.'\' c индексом '.$ph->index.':.'),
+				=> Query::error(Status::InvalidVariableType, 'string', $this->value, $ph->index),
 			self::Keys, self::KeysUnquoted, self::Values, self::ValuesUnquoted
-				=> throw new Exception('Недопустимый контекст \''.$this->value.'\' вызова метода '.__METHOD__.'.'),
+				=> Query::error(Status::InvalidContext, $this->value, __METHOD__),
 		};
 	}
 
@@ -258,10 +259,10 @@ enum Type: string {
 				=> null,
 			self::Constant, self::StringStrict, self::IntegerStrict, self::UnsignedStrict,
 			self::Numeric, self::NumericStrict, self::DoubleStrict, self::BooleanStrict, self::Blob
-				=> throw new Exception('Недопустисый тип \'NULL\' для переменной заполнителя \''.$this->value.'\' c индексом '.$ph->index.':.'),
+				=> Query::error(Status::InvalidVariableType, 'NULL', $this->value, $ph->index),
 			self::Quantifier, self::QuantifierUnquoted,
 			self::Keys, self::KeysUnquoted, self::Values, self::ValuesUnquoted
-				=> throw new Exception('Недопустимый контекст \''.$this->value.'\' вызова метода '.__METHOD__.'.'),
+				=> Query::error(Status::InvalidContext, $this->value, __METHOD__),
 			default
 				=> 'NULL',
 		};

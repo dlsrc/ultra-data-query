@@ -9,16 +9,28 @@ namespace Ultra\Data\Query;
 use Ultra\Condition;
 
 enum Status: int implements Condition {
-	case OK                 = 350;
-	case NotEnoughValues    = 351;
-	case TooManyValues      = 352;
-	case UnknownPlaceholder = 353;
+	case OK                        = 350;
+	case PlaceholdersWithoutValue  = 351;
+	case MissingSharedValue        = 352;
+	case UnexpectedSharedValueType = 353;
+	case TypeChangeDetected        = 354;
+	case UnexpectedPlaceholderType = 355;
+	case NotMatchPlaceholderType   = 356;
+	case UnexpectedValueType       = 357;
+	case InvalidArrayKeys          = 358;
+	case InvalidContext            = 359;
+	case NotContainNaturalNumber   = 360;
+	case NotContainPositiveNumber  = 361;
+	case StringNotNumeric          = 362;
+	case InvalidCharacters         = 363;
+	case InvalidVariableType       = 364;
+	case InvalidVariableValue      = 365;
 
 	public function isFatal(): bool {
 		return false;
 	}
 
-	public function message(string ...$values): string {
+	public function message(array $values = []): string {
 		$message = $this->_message();
 
 		if (count($values) > 0) {
@@ -42,10 +54,22 @@ enum Status: int implements Condition {
 
 	private function _message(): string {
 		return match($this) {
-			self::NotEnoughValues    => 'Not enough values for query "{0}". Expected {1} values, received {2}.',
-			self::TooManyValues      => 'Too many values for query "{0}". Expected {1} values, received {2}.',
-			self::UnknownPlaceholder => 'Query "{0}" contains unknown placeholder {1}.',
-			self::OK                 => 'OK',
+			self::PlaceholdersWithoutValue  => 'When filling the "{0}" query, some placeholders were left without a value: {1}.',
+			self::MissingSharedValue        => 'The query "{0}" is missing a shared value required for the placeholders with indices \'0\' and \'1\'.',
+			self::UnexpectedSharedValueType => 'Unexpected shared value type in query "{0}". Expected \'array\', got \'{1}\'.',
+			self::TypeChangeDetected        => 'While parsing SQL statement "{0}", an invalid change of placeholder type from \'{1}\' to \'{2}\' was detected.',
+			self::UnexpectedPlaceholderType => 'Unexpected placeholder type \'{0}\' with index \'{1}\'.',
+			self::NotMatchPlaceholderType   => 'The value type \'array\' does not match the placeholder type \'{0}\'.',
+			self::UnexpectedValueType       => 'Unexpected data option value type \'{0}\'.',
+			self::InvalidArrayKeys          => 'Array keys are not suitable for use as quantifiers.',
+			self::InvalidContext            => 'Invalid context \'{0}\' for calling method {1}.',
+			self::NotContainNaturalNumber   => 'The numeric string \'{0}\' does not contain a number that belongs to a positive natural number series.',
+			self::NotContainPositiveNumber  => 'Variable was expected to contain a positive number. Contains \'{0}\'.',
+			self::StringNotNumeric          => 'The string \'{0}\' is not numeric.',
+			self::InvalidCharacters         => 'The constant string \'{0}\' contains invalid characters.',
+			self::InvalidVariableType       => 'Invalid type \'{0}\' for placeholder variable \'{1}\' with index \'{2}:\'.',
+			self::InvalidVariableValue      => 'Invalid value \'{0}\' for placeholder variable \'{1}\' with index \'{2}:\'.',
+			self::OK                        => 'OK',
 		};
 	}
 }

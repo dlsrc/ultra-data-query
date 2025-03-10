@@ -10,6 +10,7 @@ use Closure;
 use Exception;
 use Ultra\Data\Placeholder\Map;
 use Ultra\Data\Query\Statement;
+use Ultra\Data\Query\Status;
 
 class Query {
 	private const string PATTERN = '/(\{)? (\w+)? (
@@ -62,23 +63,12 @@ class Query {
 	}
 
 	public function share(array $shared, string|int|float|bool|Closure|array|null ...$variables): string {
-		//return $this->_buildShared1(array_merge([$shared], $variables));
 		return $this->_build(array_merge([$shared, $shared], $variables));
 	}
 
-	public function join(array $options, int|string $common = 0, int|string $attached = 1): string {
-		$this->_commonCheck($options, $common, $attached);
-		return $this->_build(array_merge([$options[$common]], $options));
-	}
-
-	private function _commonCheck(array $options, int|string $common, int|string $attached): void {
-		if (!isset($options[$common])) {
-			throw new Exception('В запросе \''.$this->_query.'\' отсутствует разделяемое значение необходимые для заполненителей с индексами \''.$common.'\' и \''.$attached.'\'.');
-		}
-
-		if (!is_array($options[$common])) {
-			throw new Exception('Неожиденный тип значения в запросе \''.$this->_query.'\'. Ожидался \'array\', получен \''.gettype($options[0]).'\'.');
-		}
+	public function join(array $options): string {
+		$this->_commonCheck($options);
+		return $this->_build(array_merge([$options[0]], $options));
 	}
 
 	private function _build(array $vars): string {
@@ -88,34 +78,6 @@ class Query {
 
 		return $this->_dropConditions($this->_fillPraceholders($this->_query, $vars));
 	}
-
-	private function _buildShared1(array $vars, int|string $common = 0, int|string $attached = 1): string {
-		if (!$this->_statement) {
-			return $this->_query;
-		}
-
-		$keys = array_flip($this->map->keys());
-
-		if (!isset($keys[$common])) {
-			throw new Exception('В запросе \''.$this->_query.'\' отсутствует заполненитель с индексом \''.$common.'\'.');
-		}
-
-		if (!isset($keys[1])) {
-			throw new Exception('В запросе \''.$this->_query.'\' отсутствует заполненитель с индексом \''.$attached.'\'.');
-		}
-
-		$query = $this->_query;
-		$query = $this->_assignPlaceholder($this->map->get($common), $query, $vars[$common]);
-		$query = $this->_assignPlaceholder($this->map->get($attached), $query, $vars[$common]);
-		unset($keys[$common], $keys[$attached]);
-		
-		$offset = 2;
-
-		//$keys = array_map(fn($key) => $key + 2, $this->map->keys());
-
-		return $this->_dropConditions($this->_fillPraceholders($this->_query, $vars));
-	}
-
 
 	private function _make(string $statement): void {
 		if (0 == preg_match_all(self::PATTERN, $statement, $matches, PREG_OFFSET_CAPTURE)) {
@@ -147,9 +109,7 @@ class Query {
 	private function _fillPraceholders(string $query, array $vars): string {
 		$lack = [];
 
-		foreach ($this->map->iterator() as $placeholder) {
-			$id = $placeholder->id;
-
+		foreach ($this->map->iterator() as $id => $placeholder) {
 			if (isset($vars[$id])) {
 				$query = $this->_assignPlaceholder($placeholder, $query, $vars[$id]);
 			}
@@ -159,10 +119,14 @@ class Query {
 		}
 
 		if (isset($lack[0])) {
-			throw new Exception('Отсутствуют необходимые для построения запроса \''.$this->_query.'\' значения заполненителей: '.implode(', ', $lack).'.');
+			self::error(Status::PlaceholdersWithoutValue, $this->_query, implode(', ', $lack));
 		}
 
 		return $query;
+	}
+
+	public static function error(Status $status, string ...$values): never {
+		throw new Exception(message: $status->message($values), code: $status->value);
 	}
 
 	private function _assignPlaceholder(Placeholder $placeholder, string $query, string|int|float|bool|Closure|array|null $var): string {
@@ -170,5 +134,15 @@ class Query {
 		$query = str_replace($placeholder->search, $placeholder->value, $query);
 		$placeholder->flush();
 		return $query;
+	}
+
+	private function _commonCheck(array $options): void {
+		if (!isset($options[0])) {
+			self::error(Status::MissingSharedValue, $this->_query);
+		}
+
+		if (!is_array($options[0])) {
+			self::error(Status::UnexpectedSharedValueType, $this->_query, gettype($options[0]));
+		}
 	}
 }

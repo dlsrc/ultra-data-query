@@ -6,8 +6,11 @@
  */
 namespace Ultra\Data\Placeholder;
 
+use Exception;
 use Generator;
 use Ultra\Data\Placeholder;
+use Ultra\Data\Query;
+use Ultra\Data\Query\Status;
 
 class Map {
 	private array $_placeholders;
@@ -22,7 +25,7 @@ class Map {
 		}
 
 		if (!$placeholder = Type::tryFrom($type)) {
-			exit('Error Placeholder type.');
+			Query::error(Status::UnexpectedPlaceholderType, $type, $index);
 		}
 
 		$this->_placeholders[$index] = new Placeholder($index, $placeholder, $conditional);
@@ -32,25 +35,9 @@ class Map {
 		$this->_placeholders = [];
 	}
 
-	public function iterator(array|null $keys = null): Generator {
-		if (null === $keys) {
-			$keys = array_keys($this->_placeholders);
+	public function iterator(): Generator {
+		foreach ($this->_placeholders as $id => $placeholder) {
+			yield $id => $placeholder;
 		}
-		
-		foreach ($keys as $id) {
-			yield $id => $this->_placeholders[$id];
-		}
-	}
-
-	public function keys(): array {
-		return array_keys($this->_placeholders);
-	}
-
-	public function get(int|string $id): Placeholder|null {
-		if (isset($this->_placeholders[$id])) {
-			return $this->_placeholders[$id];
-		}
-
-		return null;
 	}
 }
