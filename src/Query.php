@@ -99,8 +99,16 @@ class Query {
 	}
 
 	private function _dropConditions(string $query): string {
-		if (str_contains($query, '[')) {
-            return str_replace(['[', ']'], '', preg_replace('/\[[^]]*\{\w+\}[^]]*\]/', '', $query));
+		if (str_contains($query, '[#')) {
+			if (preg_match_all('/\[#.+#\]/U', $query, $matches)) {
+				foreach ($matches[0] as $match) {
+					if (preg_match('/\{\w+\}/', $match)) {
+						$query = str_replace($match, '', $query);
+					}
+				}
+			}			
+
+            return str_replace(['[#', '#]'], '', $query);
         }
 
 		return $query;
