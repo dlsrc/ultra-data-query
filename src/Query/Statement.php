@@ -45,45 +45,50 @@ class Statement {
 		);
 	}
 
+	// Индексирование главной последовательности заполнителей $this->sequence.
+	// Заполнители, обозначенные как индексы в самом запросе, не нуждаются в индексировании.
+	// Их нужно перенести из списка типов $this->types в главную последовательность $this->sequence
+	// и временно указать тип по умолчанию.
+	// Позже, тип надо будет вычислить и обновить запись в $this->types[$id],
+	// когда будут известны все типы заполнитеоей в последовательности.
 	private function _indexSequence(string $statement): void {
 		$serial      = 0;
 		$repetitions = [];
 
-		// Индексирование главной последовательности заполнителей
 		foreach ($this->sequence as $id => $index) {
-			// Заполнители, обозначенные как индексы в самом запросе, не нуждаются в индексиловании.
-			// Их нужно перенести в главную последовательность и временно указать тип по умолчанию.
 			if (isset($this->reference[$id])) {
 				$this->sequence[$id] = $this->types[$id];
 				$this->types[$id] = '?';
-				// Тип надо вычислить и обновить запись в $types[$i] позже,
-				// когда будут известны все типы заполнитеоей в последовательности.
-				continue;
 			}
-
-			if (!isset($this->explicit[$index])) {
-				while (isset($this->explicit[$serial])) {
-					$serial++;
-				}
-
+			elseif (!isset($this->explicit[$index])) {
+				$serial = $this->_nextIndexBySerial($serial);
 				$this->sequence[$id] = (string) $serial++;
 			}
-			elseif ($this->explicit[$index] > 1) {
-				$type = $this->types[$id];
-
-				if (!isset($repetitions[$index])) { // -> Выявление неожиданной смены типа заполнителя
-					$discord = array_reduce(array_keys(array_filter($this->sequence, fn($alias) => $alias == $index)),
-						fn($carry, $item) => $carry ??= ($type != $this->types[$item]) ? $this->types[$item] : null
-					);
-
-					if ($discord) {
-						Query::error(Status::TypeChangeDetected, $statement, $type, $discord);
-					}
-				
-					$repetitions[$index] = $type;
-				} // <- Выявление неожиданной смены типа заполнителя
+			elseif ($this->explicit[$index] > 1 && !isset($repetitions[$index])) {
+				$repetitions[$index] = $this->_checkTypeImmutability($id, $index, $statement);
 			}
 		}
+	}
+
+	private function _nextIndexBySerial(int $serial): int {
+		while (isset($this->explicit[$serial])) {
+			$serial++;
+		}
+
+		return $serial;
+	}
+
+	private function _checkTypeImmutability(int $sequence_id, string $sequence_index, string $statement): string {
+		$type = $this->types[$sequence_id];
+		$discord = array_reduce(array_keys(array_filter($this->sequence, fn($alias) => $alias == $sequence_index)),
+			fn($carry, $item) => $carry ??= ($type != $this->types[$item]) ? $this->types[$item] : null
+		);
+
+		if ($discord) {
+			Query::error(Status::TypeChangeDetected, $statement, $type, $discord);
+		}
+		
+		return $type;
 	}
 
 	private function _replaceQueryHolders(string $statement): string {
