@@ -25,6 +25,7 @@ class Query {
 	public readonly string $end_quote;
 	private bool $_statement;
 	private string $_query;
+	private array $_marker;
 
 	public function __construct(
 		public readonly Closure $escape,
@@ -35,6 +36,7 @@ class Query {
 		$this->map = new Map();
 		$this->_statement = false;
 		$this->_query = '';
+		$this->_marker = [];
 
 		if ($booleans) {
 			$this->booleans = fn($value) => $value ? 'TRUE' : 'FALSE';
@@ -50,7 +52,8 @@ class Query {
 		};
 	}
 
-	public function statement(string $statement): void {
+	public function statement(string $statement, string $marker = ''): void {
+		$this->_setMarker($marker);
 		$this->_make($statement);
 	}
 
@@ -79,6 +82,14 @@ class Query {
 		return $this->_dropConditions($this->_fillPraceholders($this->_query, $vars));
 	}
 
+	private function _setMarker(string $marker): void {
+		$this->_marker = str_split($marker);
+		$this->_marker[0] ??= '';
+		$this->_marker[1] ??= $this->_marker[0];
+		$this->_marker[2] = preg_quote($this->_marker[0]);
+		$this->_marker[3] = preg_quote($this->_marker[1]);
+	}
+
 	private function _make(string $statement): void {
 		if (0 == preg_match_all(self::PATTERN, $statement, $matches, PREG_OFFSET_CAPTURE)) {
 			$this->_statement = false;
@@ -94,13 +105,13 @@ class Query {
 		);
 
 		$this->_statement = true;
-		$this->_query = $sm->buildQuery($statement);
+		$this->_query = $sm->buildQuery($statement, $this->_marker[2], $this->_marker[3]);
 		$sm->buildMap($this->map);
 	}
 
 	private function _dropConditions(string $query): string {
-		if (str_contains($query, '[#')) {
-			if (preg_match_all('/\[#.+#\]/U', $query, $matches)) {
+		if (str_contains($query, '['.$this->_marker[0])) {
+			if (preg_match_all('/\['.$this->_marker[2].'.+'.$this->_marker[3].'\]/U', $query, $matches)) {
 				foreach ($matches[0] as $match) {
 					if (preg_match('/\{\w+\}/', $match)) {
 						$query = str_replace($match, '', $query);
@@ -108,7 +119,7 @@ class Query {
 				}
 			}			
 
-            return str_replace(['[#', '#]'], '', $query);
+            return str_replace(['['.$this->_marker[0], $this->_marker[1].']'], '', $query);
         }
 
 		return $query;

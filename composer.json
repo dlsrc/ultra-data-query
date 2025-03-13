@@ -23,8 +23,8 @@
         }
     },
     "require": {
-        "php": ">=8.3",
-        "ultra/result": "^1.0.0",
-        "ultra/data": "^2.1.0"
+        "php": ">=8.4",
+        "ultra/result": "^1.4.0",
+        "ultra/data": "^2.4.0"
     }
 }

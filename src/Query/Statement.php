@@ -37,11 +37,13 @@ class Statement {
 		}
 	}
 
-	public function buildQuery(string $statement): string {
+	public function buildQuery(string $statement, string $marker_open = '', string $marker_close = '', ): string {
 		$this->_indexSequence($statement);
 
 		return $this->_captureConditionlHolders(
-			$this->_replaceQueryHolders($statement)
+			$this->_replaceQueryHolders($statement),
+			$marker_open,
+			$marker_close,
 		);
 	}
 
@@ -126,10 +128,10 @@ class Statement {
 	// которые не требуют обязательного наличия значения.
 	// В условный контекст попадают только те индексы условных блоков,
 	// количество которых совпадает с их количеством в полной последовательности.
-	private function _captureConditionlHolders(string $statement): string {
+	private function _captureConditionlHolders(string $statement, string $marker_open, string $marker_close): string {
 		$this->holders = array_count_values($this->sequence);
 
-		if (preg_match_all('/\[#.+#\]/U', $statement, $submatch) > 0) {
+		if (preg_match_all('/\['.$marker_open.'.+'.$marker_close.'\]/U', $statement, $submatch) > 0) {
 			$counts = [];
 		
 			foreach ($submatch[0] as $subquery) {
