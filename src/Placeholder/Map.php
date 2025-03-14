@@ -6,10 +6,8 @@
  */
 namespace Ultra\Data\Placeholder;
 
-use Exception;
 use Generator;
 use Ultra\Data\Placeholder;
-use Ultra\Data\Query;
 use Ultra\Data\Query\Status;
 
 class Map {
@@ -25,7 +23,7 @@ class Map {
 		}
 
 		if (!$placeholder = Type::tryFrom($type)) {
-			Query::error(Status::UnexpectedPlaceholderType, $type, $index);
+			Status::UnexpectedPlaceholderType->error($type, $index);
 		}
 
 		$this->_placeholders[$index] = new Placeholder($index, $placeholder, $conditional);

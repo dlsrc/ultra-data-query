@@ -7,7 +7,6 @@
 namespace Ultra\Data\Placeholder;
 
 use Closure;
-use Exception;
 use Ultra\Data\Placeholder;
 use Ultra\Data\Query;
 use Ultra\Data\Query\Status;
@@ -78,96 +77,20 @@ enum Type: string {
 		};
 	}
 
-	public function isQuantifierString(Query $query, mixed $value): bool {
-		if (is_string($value) && preg_match($query->quantifier, $value)) {
-			return true;
-		}
-
-		return false;
-	}
-
-	public function quotedString(Query $query, mixed $value): string {
-		if (!$this->isQuantifierString($query, $value)) {
-			Query::error(Status::InvalidArrayKeys);
-		}
-
-		return $query->start_quote.str_replace('.', $query->end_quote.'.'.$query->start_quote, $value).$query->end_quote;
-	}
-
-	public function unquotedString(Query $query, mixed $value): string {
-		if (!$this->isQuantifierString($query, $value)) {
-			Query::error(Status::InvalidArrayKeys);
-		}
-
-		return $value;
-	}
-
 	public function fnQuote(Query $query): Closure {
 		return match ($this) {
 			self::Quantifier,
 			self::Map,
 			self::MapNullable,
 			self::Keys,
-			self::Values => fn($value) => $this->quotedString($query, $value),
+			self::Values => fn($value) => $this->_quotedString($query, $value),
 			self::QuantifierUnquoted,
 			self::MapUnquoted,
 			self::MapUnquotedNullable,
 			self::KeysUnquoted,
-			self::ValuesUnquoted => fn($value) => $this->unquotedString($query, $value),
-			default => Query::error(Status::InvalidContext, $this->value, __METHOD__),
+			self::ValuesUnquoted => fn($value) => $this->_unquotedString($query, $value),
+			default => Status::InvalidContext->error($this->value, __METHOD__),
 		};
-	}
-
-	public function isNumeric(): bool {
-		return match ($this) {
-			self::Numeric,
-			self::NumericNullable,
-			self::NumericStrict,
-			self::NumericStrictNullable => true,
-			default => false,
-		};
-	}
-
-	public function isUnsigned(): bool {
-		return match ($this) {
-			self::Unsigned,
-			self::UnsignedNullable,
-			self::UnsignedStrict,
-			self::UnsignedStrictNullable => true,
-			default => false,
-		};
-	}
-
-	public function setNumeric(int|string $value): string {
-		if ($this->isUnsigned()) {
-			if ($value < 0) {
-				Query::error(Status::NotContainPositiveNumber, $value);
-			}
-		}
-
-		if ($this->isNumeric()) {
-			if ($value < 1) {
-				Query::error(Status::NotContainNaturalNumber, $value);
-			}
-		}
-
-		return (string) $value;
-	}
-
-	public function setNumericString(string $value): string {
-		if (!is_numeric($value)) {
-			Query::error(Status::StringNotNumeric, $value);
-		}
-
-		return $this->setNumeric($value);
-	}
-
-	public function setConstantString(Query $query, string $value): string {
-		if (($query->escape)($value) == $value) {
-			return $value;
-		}
-
-		Query::error(Status::InvalidCharacters, $value);
 	}
 
 	public function fromBoolean(Query $query, Placeholder $ph, bool $value): string|null {
@@ -187,17 +110,17 @@ enum Type: string {
 			self::Blob
 				=> (binary) $value,
 			self::Numeric, self::NumericNullable, self::NumericStrictNullable
-				=> $value ? '1' : Query::error(Status::InvalidVariableValue, 'FALSE', $this->value, $ph->index),
+				=> $value ? '1' : Status::InvalidVariableValue->error('FALSE', $this->value, $ph->index),
 			self::Constant, self::ConstantNullable, self::StringStrict, self::IntegerStrict,
 			self::UnsignedStrict, self::NumericStrict, self::DoubleStrict
-				=> Query::error(Status::InvalidVariableType, 'boolean', $this->value, $ph->index),
+				=> Status::InvalidVariableType->error('boolean', $this->value, $ph->index),
 			self::Quantifier, self::QuantifierUnquoted, self::Keys,
 			self::KeysUnquoted, self::Values, self::ValuesUnquoted
-				=> Query::error(Status::InvalidContext, $this->value, __METHOD__),
+				=> Status::InvalidContext->error($this->value, __METHOD__),
 		};
 	}
 
-	public function fromNumeric(Query $query, Placeholder $ph, int|float $value): string|null {
+	public function fromInteger(Query $query, Placeholder $ph, int $value): string|null {
 		return match ($this) {
 			self::Sequence, self::Nullable, self::List, self::ListNullable,
 			self::Integer, self::IntegerStrict, self::IntegerNullable, self::IntegerStrictNullable,
@@ -206,7 +129,7 @@ enum Type: string {
 				=> (string) $value,
 			self::Unsigned, self::UnsignedStrict, self::UnsignedNullable, self::UnsignedStrictNullable,
 			self::Numeric, self::NumericStrict, self::NumericNullable, self::NumericStrictNullable,
-				=> $this->setNumeric($value),
+				=> $this->_setNaturalInteger($value),
 			self::String, self::StringNullable, self::StringStrictNullable
 				=> '\''.$value.'\'',
 			self::Boolean, self::BooleanNullable, self::BooleanStrictNullable
@@ -216,9 +139,34 @@ enum Type: string {
 			self::Blob
 				=> (binary) $value,
 			self::Constant, self::ConstantNullable, self::StringStrict, self::BooleanStrict
-				=> Query::error(Status::InvalidVariableType, gettype($value), $this->value, $ph->index),
+				=> Status::InvalidVariableType->error(gettype($value), $this->value, $ph->index),
 			self::Quantifier, self::QuantifierUnquoted, self::Keys, self::KeysUnquoted, self::Values, self::ValuesUnquoted
-				=> Query::error(Status::InvalidContext, $this->value, __METHOD__),
+				=> Status::InvalidContext->error($this->value, __METHOD__),
+		};
+	}
+
+	public function fromDouble(Query $query, Placeholder $ph, float $value): string|null {
+		return match ($this) {
+			self::Sequence, self::Nullable, self::List, self::ListNullable,
+			self::Double, self::DoubleStrict, self::DoubleNullable, self::DoubleStrictNullable,
+			self::Map, self::MapNullable, self::MapUnquoted, self::MapUnquotedNullable
+				=> (string) $value,
+			self::Integer, self::IntegerStrict, self::IntegerNullable, self::IntegerStrictNullable,
+			self::Unsigned, self::UnsignedStrict, self::UnsignedNullable, self::UnsignedStrictNullable,
+			self::Numeric, self::NumericStrict, self::NumericNullable, self::NumericStrictNullable,
+				=> $this->_setFloatAsInt($value, $ph->index),
+			self::String, self::StringNullable, self::StringStrictNullable
+				=> '\''.$value.'\'',
+			self::Boolean, self::BooleanNullable, self::BooleanStrictNullable
+				=> ($query->booleans)((bool) $value),
+			self::Fake
+				=> $value ? '' : null,
+			self::Blob
+				=> (binary) $value,
+			self::Constant, self::ConstantNullable, self::StringStrict, self::BooleanStrict
+				=> Status::InvalidVariableType->error(gettype($value), $this->value, $ph->index),
+			self::Quantifier, self::QuantifierUnquoted, self::Keys, self::KeysUnquoted, self::Values, self::ValuesUnquoted
+				=> Status::InvalidContext->error($this->value, __METHOD__),
 		};
 	}
 
@@ -227,9 +175,12 @@ enum Type: string {
 			self::String, self::StringStrict, self::StringNullable, self::StringStrictNullable, self::List, self::ListNullable,
 			self::Map, self::MapNullable, self::MapUnquoted, self::MapUnquotedNullable, self::Sequence, self::Nullable
 				=> '\''.($query->escape)($value).'\'',
-			self::Integer, self::IntegerNullable, self::IntegerStrictNullable, self::Unsigned, self::UnsignedNullable, self::UnsignedStrictNullable,
-			self::Numeric, self::NumericNullable, self::NumericStrictNullable, self::Double, self::DoubleNullable, self::DoubleStrictNullable
-				=> $this->setNumericString($value),
+			self::Integer, self::IntegerNullable, self::IntegerStrictNullable,
+			self::Unsigned, self::UnsignedNullable, self::UnsignedStrictNullable,
+			self::Numeric, self::NumericNullable, self::NumericStrictNullable
+				=> $this->_setIntFromString($value),
+			self::Double, self::DoubleNullable, self::DoubleStrictNullable
+				=> $this->_setFloatFromString($value),
 			self::Boolean, self::BooleanNullable, self::BooleanStrictNullable
 				=> ($query->booleans)((bool) $value),
 			self::Fake
@@ -237,13 +188,13 @@ enum Type: string {
 			self::Quantifier, self::QuantifierUnquoted
 				=> $this->fnQuote($query)($value),
 			self::Constant, self::ConstantNullable
-				=> $this->setConstantString($query, $value),
+				=> $this->_setConstantString($query, $value),
 			self::Blob
 				=> (binary) $value,
 			self::IntegerStrict, self::UnsignedStrict, self::NumericStrict, self::DoubleStrict, self::BooleanStrict
-				=> Query::error(Status::InvalidVariableType, 'string', $this->value, $ph->index),
+				=> Status::InvalidVariableType->error('string', $this->value, $ph->index),
 			self::Keys, self::KeysUnquoted, self::Values, self::ValuesUnquoted
-				=> Query::error(Status::InvalidContext, $this->value, __METHOD__),
+				=> Status::InvalidContext->error($this->value, __METHOD__),
 		};
 	}
 
@@ -259,12 +210,116 @@ enum Type: string {
 				=> null,
 			self::Constant, self::StringStrict, self::IntegerStrict, self::UnsignedStrict,
 			self::Numeric, self::NumericStrict, self::DoubleStrict, self::BooleanStrict, self::Blob
-				=> Query::error(Status::InvalidVariableType, 'NULL', $this->value, $ph->index),
+				=> Status::InvalidVariableType->error('NULL', $this->value, $ph->index),
 			self::Quantifier, self::QuantifierUnquoted,
 			self::Keys, self::KeysUnquoted, self::Values, self::ValuesUnquoted
-				=> Query::error(Status::InvalidContext, $this->value, __METHOD__),
+				=> Status::InvalidContext->error($this->value, __METHOD__),
 			default
 				=> 'NULL',
 		};
+	}
+
+	private function _isQuantifierString(Query $query, mixed $value): bool {
+		if (is_string($value) && preg_match($query->quantifier, $value)) {
+			return true;
+		}
+
+		return false;
+	}
+
+	private function _quotedString(Query $query, mixed $value): string {
+		if (!$this->_isQuantifierString($query, $value)) {
+			Status::InvalidArrayKeys->error();
+		}
+
+		return $query->start_quote.str_replace('.', $query->end_quote.'.'.$query->start_quote, $value).$query->end_quote;
+	}
+
+	private function _unquotedString(Query $query, mixed $value): string {
+		if (!$this->_isQuantifierString($query, $value)) {
+			Status::InvalidArrayKeys->error();
+		}
+
+		return $value;
+	}
+
+	private function _isNumeric(): bool {
+		return match ($this) {
+			self::Numeric,
+			self::NumericNullable,
+			self::NumericStrict,
+			self::NumericStrictNullable => true,
+			default => false,
+		};
+	}
+
+	private function _isUnsigned(): bool {
+		return match ($this) {
+			self::Unsigned,
+			self::UnsignedNullable,
+			self::UnsignedStrict,
+			self::UnsignedStrictNullable => true,
+			default => false,
+		};
+	}
+
+	private function _setNaturalInteger(int|string $value): string {
+		if ($this->_isUnsigned()) {
+			if ($value < 0) {
+				Status::NotContainPositiveNumber->error($value);
+			}
+		}
+
+		if ($this->_isNumeric()) {
+			if ($value < 1) {
+				Status::NotContainNaturalNumber->error($value);
+			}
+		}
+
+		return (string) $value;
+	}
+
+	private function _setFloatFromString(string $value): string {
+		$this->_checkNumeric($value);
+		return $value;
+	}
+
+	private function _setIntFromString(string $value): string {
+		$this->_checkNumeric($value);
+		$this->_checkValidIntString($value);
+		return $this->_setNaturalInteger($value);
+	}
+
+	private function _checkNumeric(string $value): void {
+		if (!is_numeric($value)) {
+			Status::StringNotNumeric->error($value);
+		}
+	}
+
+	private function _checkValidIntString(string $value): void {
+		$int = (int) $value;
+		$float = (float) $value;
+
+		if ($int != $float) {
+			Status::FloatDataLoss->error($value);
+		}
+	}
+
+	private function _setFloatAsInt(float $value, string $index): string {
+		$int = (int) $value;
+
+		if ($int != $value) {
+			Status::FloatDataLoss->error($value, $index);
+		}
+
+		return (string) $int;
+	}
+
+	private function _setConstantString(Query $query, string $value): string {
+		if (($query->escape)($value) == $value) {
+			return $value;
+		}
+
+		Status::InvalidCharacters->error($value);
 	}
 }

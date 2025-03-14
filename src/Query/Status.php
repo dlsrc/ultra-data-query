@@ -6,6 +6,7 @@
  */
 namespace Ultra\Data\Query;
 
+use Exception;
 use Ultra\Condition;
 
 enum Status: int implements Condition {
@@ -25,9 +26,14 @@ enum Status: int implements Condition {
 	case InvalidCharacters         = 363;
 	case InvalidVariableType       = 364;
 	case InvalidVariableValue      = 365;
+	case FloatDataLoss             = 366;
 
 	public function isFatal(): bool {
 		return false;
+	}
+
+	public function error(int|float|string|bool|null ...$values): never {
+		throw new Exception(message: $this->message($values), code: $this->value);
 	}
 
 	public function message(array $values = []): string {
@@ -69,6 +75,7 @@ enum Status: int implements Condition {
 			self::InvalidCharacters         => 'The constant string \'{0}\' contains invalid characters.',
 			self::InvalidVariableType       => 'Invalid type \'{0}\' for placeholder variable \'{1}\' with index \'{2}:\'.',
 			self::InvalidVariableValue      => 'Invalid value \'{0}\' for placeholder variable \'{1}\' with index \'{2}:\'.',
+			self::FloatDataLoss             => 'Attempting to pass a floating point number \'{0}\' to an integer placeholder \'{1}:\' with data loss.',
 			self::OK                        => 'OK',
 		};
 	}

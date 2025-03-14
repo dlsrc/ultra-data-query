@@ -7,7 +7,6 @@
 namespace Ultra\Data\Query;
 
 use Ultra\Data\Placeholder\Map;
-use Ultra\Data\Query;
 
 class Statement {
 	private array $holders;
@@ -87,7 +86,7 @@ class Statement {
 		);
 
 		if ($discord) {
-			Query::error(Status::TypeChangeDetected, $statement, $type, $discord);
+			Status::TypeChangeDetected->error($statement, $type, $discord);
 		}
 		
 		return $type;

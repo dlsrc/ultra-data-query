@@ -7,7 +7,6 @@
 namespace Ultra\Data;
 
 use Closure;
-use Exception;
 use Ultra\Data\Placeholder\Map;
 use Ultra\Data\Query\Statement;
 use Ultra\Data\Query\Status;
@@ -138,14 +137,10 @@ class Query {
 		}
 
 		if (isset($lack[0])) {
-			self::error(Status::PlaceholdersWithoutValue, $this->_query, implode(', ', $lack));
+			Status::PlaceholdersWithoutValue->error($this->_query, implode(', ', $lack));
 		}
 
 		return $query;
-	}
-
-	public static function error(Status $status, string ...$values): never {
-		throw new Exception(message: $status->message($values), code: $status->value);
 	}
 
 	private function _assignPlaceholder(Placeholder $placeholder, string $query, string|int|float|bool|Closure|array|null $var): string {
@@ -157,11 +152,11 @@ class Query {
 
 	private function _commonCheck(array $options): void {
 		if (!isset($options[0])) {
-			self::error(Status::MissingSharedValue, $this->_query);
+			Status::MissingSharedValue->error($this->_query);
 		}
 
 		if (!is_array($options[0])) {
-			self::error(Status::UnexpectedSharedValueType, $this->_query, gettype($options[0]));
+			Status::UnexpectedSharedValueType->error($this->_query, gettype($options[0]));
 		}
 	}
 }

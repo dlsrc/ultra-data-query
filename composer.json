@@ -2,7 +2,7 @@
     "name": "ultra/data-query",
     "version": "1.0.0",
     "type": "library",
-    "description": "Classes for building and parsing SQL queries.",
+    "description": "Generate SQL queries from templates with placeholder markers and parameter values ​​for those placeholders.",
     "license": "MIT",
     "repositories": [
         {

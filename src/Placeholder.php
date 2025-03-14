@@ -7,7 +7,6 @@
 namespace Ultra\Data;
 
 use Closure;
-use Exception;
 use Ultra\Data\Placeholder\Type;
 use Ultra\Data\Query\Status;
 
@@ -46,7 +45,7 @@ class Placeholder {
 				$this->_fromValues($query, $var);
 			}
 			else {
-				Query::error(Status::NotMatchPlaceholderType, $this->type->value);
+				Status::NotMatchPlaceholderType->error($this->type->value);
 			}
 		}
 		else {
@@ -86,11 +85,11 @@ class Placeholder {
 	private function _setVar(Query $query, mixed $value): string {
 		return match(gettype($value)) {
 			'string'  => $this->type->fromString($query, $this, $value),
-			'integer',
-			'double'  => $this->type->fromNumeric($query, $this, $value),
+			'integer' => $this->type->fromInteger($query, $this, $value),
+			'double'  => $this->type->fromDouble($query, $this, $value),
 			'boolean' => $this->type->fromBoolean($query, $this, $value),
 			'NULL'    => $this->type->fromNull($query, $this),
-			default   => Query::error(Status::UnexpectedValueType, gettype($value)),
+			default   => Status::UnexpectedValueType->error(gettype($value)),
 		};
 	}
 }
