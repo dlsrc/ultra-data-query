@@ -220,7 +220,7 @@ enum Type: string {
 	}
 
 	private function _isQuantifierString(Query $query, mixed $value): bool {
-		if (is_string($value) && preg_match($query->quantifier, $value)) {
+		if (is_string($value) && preg_match($query->quantifiers, $value)) {
 			return true;
 		}
 
@@ -315,8 +315,16 @@ enum Type: string {
 		return (string) $int;
 	}
 
+	private function _isConstantString(Query $query, string $value): bool {
+		if (preg_match($query->constants, $value)) {
+			return true;
+		}
+
+		return false;
+	}
+
 	private function _setConstantString(Query $query, string $value): string {
-		if (($query->escape)($value) == $value) {
+		if ($this->_isConstantString($query, $value)) {
 			return $value;
 		}
 

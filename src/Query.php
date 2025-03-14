@@ -12,7 +12,7 @@ use Ultra\Data\Query\Statement;
 use Ultra\Data\Query\Status;
 
 class Query {
-	private const string PATTERN = '/(\{)? (\w+)? (
+	private const string PLACEHOLDERS = '/(\{)? (\w+)? (
 		(?<!\:|\}) \: (?!\:|\{) [abdfiknqsuvzABCDIKLNQSUV]? |
 		(?<!\?|\}) \? (?!\?|\{) [abdinsuzABCDILNSU]? |
 		(?<=\{)   \w+ (?=\})
@@ -28,7 +28,8 @@ class Query {
 
 	public function __construct(
 		public readonly Closure $escape,
-		public readonly string $quantifier = '/^[^\W\d]([\w\.]*\w)?$/u',
+		public readonly string $constants = '/^@{0,2}[^\W\d]([\w\.\(\s]*(\w|\)))?$/',
+		public readonly string $quantifiers = '/^[^\W\d]([\w\.]*\w)?$/u',
 		bool $booleans = false,
 		string $quotes = '`',
 	) {
@@ -90,7 +91,7 @@ class Query {
 	}
 
 	private function _make(string $statement): void {
-		if (0 == preg_match_all(self::PATTERN, $statement, $matches, PREG_OFFSET_CAPTURE)) {
+		if (0 == preg_match_all(self::PLACEHOLDERS, $statement, $matches, PREG_OFFSET_CAPTURE)) {
 			$this->_statement = false;
 			$this->_query = $statement;
 			return;
