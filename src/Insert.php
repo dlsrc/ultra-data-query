@@ -18,7 +18,6 @@ final class Insert {
 	private array $_fields;
 	private array $_types;
 	private array $_values;
-	private bool $_boolean;
 	private int $_count;
 	private Fail|null $_error;
 
@@ -28,7 +27,6 @@ final class Insert {
 		$this->_fields   = [];
 		$this->_types    = [];
 		$this->_values   = [];
-		$this->_boolean  = false;
 		$this->_count    = 0;
 		$this->_error    = null;
 		$this->names($table, $fields);
@@ -155,7 +153,7 @@ final class Insert {
 			if (Insertion::Boolean == $expected) {
 				$prepare = (bool) (int) $value;
 
-				if ($this->_boolean) {
+				if ($this->contract->boolean_support) {
 					$value = $prepare ? 'TRUE' : 'FALSE';
 				}
 				else {
@@ -192,7 +190,7 @@ final class Insert {
 			if (Insertion::Boolean == $expected) {
 				$prepare = (bool) $value;
 
-				if ($this->_boolean) {
+				if ($this->contract->boolean_support) {
 					$value = $prepare ? 'TRUE' : 'FALSE';
 				}
 				else {
@@ -229,7 +227,7 @@ final class Insert {
 			if (Insertion::Boolean == $expected) {
 				$prepare = (bool) $value;
 
-				if ($this->_boolean) {
+				if ($this->contract->boolean_support) {
 					$value = $prepare ? 'TRUE' : 'FALSE';
 				}
 				else {
@@ -243,7 +241,7 @@ final class Insert {
 
 		case 'boolean':
 			if ($type->isBoolean()) {
-				if ($this->_boolean) {
+				if ($this->contract->boolean_support) {
 					$value = $value ? 'TRUE' : 'FALSE';
 				}
 				else {
@@ -357,17 +355,13 @@ final class Insert {
 		}
 	}
 
-	public function useBoolean(): void {
-		$this->_boolean = Statement::get($this->contract)->boolean_supported;
-	}
-
 	public function build(bool $ignore = true): State {
 		if ($this->isError()) {
 			return $this->_error;
 		}
 
 		$s = Statement::get($this->contract);
-		$q = $s->id_quote;
+		$q = $this->contract->quotes;
 
 		$sql = $q.$this->_table.$q.' ('.$q.implode($q.', '.$q, $this->_fields).$q.') '.
 		'VALUES '.implode(', ', $this->_values);
