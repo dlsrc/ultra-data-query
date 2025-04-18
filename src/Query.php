@@ -52,9 +52,15 @@ class Query {
 		};
 	}
 
-	public function statement(string $statement, string $marker = ''): void {
+	public function stmt(string $statement, string $marker = ''): void {
 		$this->_setMarker($marker);
 		$this->_make($statement);
+	}
+
+	public function attach(string $statement, string $marker = ''): void {
+		$query = $this->_query;
+		$this->stmt($statement, $marker);
+		$this->_query = $query.' '.$this->_query;
 	}
 
 	public function list(string|int|float|bool|Closure|array|null ...$variables): string {
