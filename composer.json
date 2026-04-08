@@ -1,6 +1,6 @@
 {
     "name": "ultra/data-query",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "type": "library",
     "description": "Generate SQL queries from templates with placeholder markers and parameter values for those placeholders.",
     "license": "MIT",
@@ -24,7 +24,7 @@
     },
     "require": {
         "php": ">=8.4",
-        "ultra/result": "^1.4.0",
-        "ultra/data": "^2.4.0"
+        "ultra/result": "^2.1.0",
+        "ultra/data": "^2.5.0"
     }
 }
