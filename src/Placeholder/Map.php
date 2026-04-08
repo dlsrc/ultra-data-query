@@ -6,7 +6,6 @@
  */
 namespace Ultra\Data\Placeholder;
 
-use Generator;
 use Ultra\Data\Placeholder;
 use Ultra\Data\Query\Status;
 
@@ -33,7 +32,7 @@ class Map {
 		$this->_placeholders = [];
 	}
 
-	public function iterator(): Generator {
+	public function iterator() {
 		foreach ($this->_placeholders as $id => $placeholder) {
 			yield $id => $placeholder;
 		}

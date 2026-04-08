@@ -9,6 +9,12 @@ namespace Ultra\Data\Query;
 use Ultra\Data\Placeholder\Map;
 
 class Statement {
+	private const string PLACEHOLDERS = '/(\{)? (\w+)? (
+		(?<!\:|\}) \: (?!\:|\{) [abdfiknqsuvzABCDIKLNQSUV]? |
+		(?<!\?|\}) \? (?!\?|\{) [abdinsuzABCDILNSU]? |
+		(?<=\{)   \w+ (?=\})
+	)(?(1)\})/ux';
+
 	private array $holders;
 	private array $captures;
 	private array $sequence;
@@ -16,15 +22,16 @@ class Statement {
 	private array $explicit;
 	private array $reference;
 
-	public function __construct(array $holders, array $captures, array $sequence, array $types) {
-		$this->holders   = $holders;
-		$this->captures  = $captures;
-		$this->sequence  = $sequence;
-		$this->types     = $types;
-		$this->explicit  = array_count_values(array_filter($sequence, fn($index) => '' != $index));
-		$this->reference = array_filter(
-			$types,
-			fn($value) => !str_starts_with($value, '?') && !str_starts_with($value, ':')
+	public static function get(string $statement): self|null {
+		if (0 == preg_match_all(self::PLACEHOLDERS, $statement, $matches, PREG_OFFSET_CAPTURE)) {
+			return null;
+		}
+
+		return new Statement(
+			holders:  array_map(fn($match) => $match[0], $matches[0]),
+			captures: array_map(fn($match) => $match[1], $matches[0]),
+			sequence: array_map(fn($match) => $match[0], $matches[2]),
+			types:    array_map(fn($match) => $match[0], $matches[3]),
 		);
 	}
 
@@ -39,10 +46,22 @@ class Statement {
 	public function buildQuery(string $statement, string $marker_open = '', string $marker_close = '', ): string {
 		$this->_indexSequence($statement);
 
-		return $this->_captureConditionlHolders(
+		return $this->_captureConditionHolders(
 			$this->_replaceQueryHolders($statement),
 			$marker_open,
 			$marker_close,
+		);
+	}
+
+	private function __construct(array $holders, array $captures, array $sequence, array $types) {
+		$this->holders   = $holders;
+		$this->captures  = $captures;
+		$this->sequence  = $sequence;
+		$this->types     = $types;
+		$this->explicit  = array_count_values(array_filter($sequence, fn($index) => '' != $index));
+		$this->reference = array_filter(
+			$types,
+			fn($value) => !str_starts_with($value, '?') && !str_starts_with($value, ':')
 		);
 	}
 
@@ -127,7 +146,7 @@ class Statement {
 	// которые не требуют обязательного наличия значения.
 	// В условный контекст попадают только те индексы условных блоков,
 	// количество которых совпадает с их количеством в полной последовательности.
-	private function _captureConditionlHolders(string $statement, string $marker_open, string $marker_close): string {
+	private function _captureConditionHolders(string $statement, string $marker_open, string $marker_close): string {
 		$this->holders = array_count_values($this->sequence);
 
 		if (preg_match_all('/\['.$marker_open.'.+'.$marker_close.'\]/U', $statement, $submatch) > 0) {

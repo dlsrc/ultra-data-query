@@ -108,7 +108,7 @@ enum Type: string {
 			self::Fake
 				=> $value ? '' : null,
 			self::Blob
-				=> (binary) $value,
+				=> (string) $value,
 			self::Numeric, self::NumericNullable, self::NumericStrictNullable
 				=> $value ? '1' : Status::InvalidVariableValue->error('FALSE', $this->value, $ph->index),
 			self::Constant, self::ConstantNullable, self::StringStrict, self::IntegerStrict,
@@ -137,7 +137,7 @@ enum Type: string {
 			self::Fake
 				=> $value ? '' : null,
 			self::Blob
-				=> (binary) $value,
+				=> (string) $value,
 			self::Constant, self::ConstantNullable, self::StringStrict, self::BooleanStrict
 				=> Status::InvalidVariableType->error(gettype($value), $this->value, $ph->index),
 			self::Quantifier, self::QuantifierUnquoted, self::Keys, self::KeysUnquoted, self::Values, self::ValuesUnquoted
@@ -162,7 +162,7 @@ enum Type: string {
 			self::Fake
 				=> $value ? '' : null,
 			self::Blob
-				=> (binary) $value,
+				=> (string) $value,
 			self::Constant, self::ConstantNullable, self::StringStrict, self::BooleanStrict
 				=> Status::InvalidVariableType->error(gettype($value), $this->value, $ph->index),
 			self::Quantifier, self::QuantifierUnquoted, self::Keys, self::KeysUnquoted, self::Values, self::ValuesUnquoted
@@ -190,7 +190,7 @@ enum Type: string {
 			self::Constant, self::ConstantNullable
 				=> $this->_setConstantString($query, $value),
 			self::Blob
-				=> (binary) $value,
+				=> (string) $value,
 			self::IntegerStrict, self::UnsignedStrict, self::NumericStrict, self::DoubleStrict, self::BooleanStrict
 				=> Status::InvalidVariableType->error('string', $this->value, $ph->index),
 			self::Keys, self::KeysUnquoted, self::Values, self::ValuesUnquoted
@@ -220,7 +220,7 @@ enum Type: string {
 	}
 
 	private function _isQuantifierString(Query $query, mixed $value): bool {
-		if (is_string($value) && preg_match($query->quantifiers, $value)) {
+		if (is_string($value) && preg_match($query->qualifiers, $value)) {
 			return true;
 		}
 
@@ -329,5 +329,6 @@ enum Type: string {
 		}
 
 		Status::InvalidCharacters->error($value);
+		return '';
 	}
 }

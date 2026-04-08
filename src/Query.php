@@ -12,12 +12,9 @@ use Ultra\Data\Query\Statement;
 use Ultra\Data\Query\Status;
 
 class Query {
-	private const string PLACEHOLDERS = '/(\{)? (\w+)? (
-		(?<!\:|\}) \: (?!\:|\{) [abdfiknqsuvzABCDIKLNQSUV]? |
-		(?<!\?|\}) \? (?!\?|\{) [abdinsuzABCDILNSU]? |
-		(?<=\{)   \w+ (?=\})
-	)(?(1)\})/ux';
-
+	public readonly Closure $escape;
+	public readonly string $constants;
+	public readonly string $qualifiers;
 	public readonly Map $map;
 	public readonly Closure $booleans;
 	public readonly string $start_quote;
@@ -26,13 +23,10 @@ class Query {
 	private string $_query;
 	private array $_marker;
 
-	public function __construct(
-		public readonly Closure $escape,
-		public readonly string $constants = '/^@{0,2}[^\W\d]([\w\.\(\s]*(\w|\)))?$/',
-		public readonly string $quantifiers = '/^[^\W\d]([\w\.]*\w)?$/u',
-		bool $booleans = false,
-		string $quotes = '`',
-	) {
+	public function __construct(Closure $escape, string $quotes = '`', bool $booleans = false, string|null $constants = null, string|null $qualifiers = null) {
+		$this->escape = $escape;
+		$this->constants = $constants ?? '/^@{0,2}[^\W\d]([\w\.\(\)\s,]*(\w|\)))?$/';
+		$this->qualifiers = $qualifiers ?? '/^[^\W\d]([\w\.]*\w)?$/u';
 		$this->map = new Map();
 		$this->_statement = false;
 		$this->_query = '';
@@ -97,22 +91,15 @@ class Query {
 	}
 
 	private function _make(string $statement): void {
-		if (0 == preg_match_all(self::PLACEHOLDERS, $statement, $matches, PREG_OFFSET_CAPTURE)) {
+		if ($sm = Statement::get($statement)) {
+			$this->_statement = true;
+			$this->_query = $sm->buildQuery($statement, $this->_marker[2], $this->_marker[3]);
+			$sm->buildMap($this->map);
+		}
+		else {
 			$this->_statement = false;
 			$this->_query = $statement;
-			return;
 		}
-
-		$sm = new Statement(
-			holders:  array_map(fn($match) => $match[0], $matches[0]),
-			captures: array_map(fn($match) => $match[1], $matches[0]),
-			sequence: array_map(fn($match) => $match[0], $matches[2]),
-			types:    array_map(fn($match) => $match[0], $matches[3]),
-		);
-
-		$this->_statement = true;
-		$this->_query = $sm->buildQuery($statement, $this->_marker[2], $this->_marker[3]);
-		$sm->buildMap($this->map);
 	}
 
 	private function _dropConditions(string $query): string {
